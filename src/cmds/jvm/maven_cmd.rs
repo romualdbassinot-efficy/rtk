@@ -20,10 +20,6 @@ lazy_static! {
     static ref TEST_RESULT_RE: Regex =
         Regex::new(r"Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s*(\d+),\s*Skipped:\s*(\d+)").unwrap();
 
-    // Surefire test class header: "Running com.example.FooTest"
-    static ref RUNNING_TEST_RE: Regex =
-        Regex::new(r"^\[INFO\] Running\s+(\S+)").unwrap();
-
     // Surefire failure line: "ClassName.methodName:line message"
     static ref FAILURE_SUMMARY_RE: Regex =
         Regex::new(r"^\[ERROR\]\s+(\S+\.\S+):(\d+)\s+(.+)").unwrap();
@@ -52,17 +48,15 @@ lazy_static! {
     static ref TOTAL_TIME_RE: Regex =
         Regex::new(r"^\[INFO\] Total time:\s+(.+)").unwrap();
 
-    // Compilation error
+    // Compilation error: "[ERROR] <path>:[line,col] message". Accepts a Unix
+    // absolute path or a Windows drive-letter path, since the same filter runs
+    // on both.
     static ref COMPILE_ERROR_RE: Regex =
-        Regex::new(r"^\[ERROR\]\s+/").unwrap();
+        Regex::new(r"^\[ERROR\]\s+(?:/|[A-Za-z]:[\\/])").unwrap();
 
     // Reactor Summary header
     static ref REACTOR_SUMMARY_RE: Regex =
         Regex::new(r"^\[INFO\] Reactor Summary").unwrap();
-
-    // Building module header
-    static ref BUILDING_MODULE_RE: Regex =
-        Regex::new(r"^\[INFO\] Building\s+\S").unwrap();
 
     // Compiling N source files
     static ref COMPILING_RE: Regex =
@@ -328,6 +322,7 @@ fn filter_mvn_test(output: &str) -> String {
     let mut build_status = String::new();
     let mut total_time = String::new();
     let mut in_failures_section = false;
+    let mut build_errors: Vec<String> = Vec::new();
 
     for line in output.lines() {
         let trimmed = line.trim();
@@ -342,6 +337,20 @@ fn filter_mvn_test(output: &str) -> String {
         if let Some(caps) = TOTAL_TIME_RE.captures(trimmed) {
             total_time = caps[1].to_string();
             continue;
+        }
+
+        // Compiler diagnostics. When compilation fails no test ever runs, so
+        // without these the whole output collapses to "BUILD FAILURE" and the
+        // caller has to re-run the raw command to learn anything. Maven prints
+        // each diagnostic twice - once under "COMPILATION ERROR" and again
+        // under "Failed to execute goal" - so dedupe while keeping order.
+        // Deliberately no `continue`: this leaves every existing state
+        // transition below untouched.
+        if COMPILE_ERROR_RE.is_match(trimmed) {
+            let entry = truncate(trimmed, 150).to_string();
+            if !build_errors.contains(&entry) {
+                build_errors.push(entry);
+            }
         }
 
         // Detect [ERROR] Failures: section (Surefire summary)
@@ -487,13 +496,30 @@ fn filter_mvn_test(output: &str) -> String {
     let total_failed = total_failures + total_errors;
     let total_passed = total_run.saturating_sub(total_failed + total_skipped);
 
-    // No tests found
+    // No tests ran
     if total_run == 0 {
         let time_info = if total_time.is_empty() {
             String::new()
         } else {
             format!(" ({})", total_time)
         };
+        // Compilation failed before any test could run — report the
+        // diagnostics, which are the only actionable thing in the output.
+        if !build_errors.is_empty() {
+            let mut result = format!(
+                "mvn test: {} build errors{}\n",
+                build_errors.len(),
+                time_info
+            );
+            result.push_str("=======================================\n");
+            for error in build_errors.iter().take(10) {
+                result.push_str(&format!("  {}\n", error));
+            }
+            if build_errors.len() > 10 {
+                result.push_str(&format!("  ... +{} more errors\n", build_errors.len() - 10));
+            }
+            return result.trim().to_string();
+        }
         if build_status == "FAILURE" {
             return format!("mvn test: BUILD FAILURE{}", time_info);
         }
@@ -743,6 +769,34 @@ mod tests {
     fn test_filter_mvn_test_empty() {
         let output = filter_mvn_test("");
         assert!(output.contains("mvn test:"));
+    }
+
+    #[test]
+    fn test_filter_mvn_test_reports_compile_errors() {
+        // Compilation fails, so no test runs. The diagnostics are the only
+        // actionable content and must survive; previously this whole fixture
+        // collapsed to "mvn test: BUILD FAILURE".
+        let input = include_str!("../../../tests/fixtures/mvn_compile_fail_raw.txt");
+        let output = filter_mvn_test(input);
+
+        assert!(
+            output.starts_with("mvn test: 3 build errors"),
+            "expected deduped compile-error summary, got: {}",
+            output
+        );
+        assert!(output.contains("cannot find symbol"));
+        assert!(output.contains("package javax.ws.rs does not exist"));
+        assert!(
+            !output.contains("BUILD FAILURE"),
+            "the error list replaces the bare status line"
+        );
+    }
+
+    #[test]
+    fn test_compile_error_re_matches_windows_paths() {
+        assert!(COMPILE_ERROR_RE.is_match(r"[ERROR] /src/main/java/A.java:[1,2] boom"));
+        assert!(COMPILE_ERROR_RE.is_match(r"[ERROR] C:\src\main\java\A.java:[1,2] boom"));
+        assert!(!COMPILE_ERROR_RE.is_match("[ERROR] Tests run: 4, Failures: 1"));
     }
 
     // ============================================================
