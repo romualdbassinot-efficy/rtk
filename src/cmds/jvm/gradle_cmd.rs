@@ -232,8 +232,20 @@ fn filter_gradle_build(output: &str) -> String {
 
 /// Filter Gradle test output: show only failures and summary
 fn filter_gradle_test(output: &str) -> String {
-    let mut passed: usize = 0;
-    let mut failed: usize = 0;
+    // Two independent sources of truth, and neither is always present:
+    //
+    //   per-test lines  "com.x.FooTest > testBar PASSED"   - only when the
+    //                   build configures testLogging events
+    //   summary line    "20 tests completed, 2 failed"     - Gradle emits this
+    //                   as part of the Test task *failure* message, so a green
+    //                   run does not print it at all
+    //
+    // Counting only the summary means a fully passing run reports "no tests
+    // found"; counting only the per-test lines loses the skipped count. Take
+    // the summary when it is there and fall back to the tallied lines.
+    let mut summary: Option<(usize, usize, usize)> = None; // (total, failed, skipped)
+    let mut counted_passed: usize = 0;
+    let mut counted_failed: usize = 0;
     let mut failures: Vec<TestFailure> = Vec::new();
     let mut current_failure: Option<TestFailure> = None;
     let mut in_failure_block = false;
@@ -263,8 +275,7 @@ fn filter_gradle_test(output: &str) -> String {
                 .get(3)
                 .and_then(|m| m.as_str().parse().ok())
                 .unwrap_or(0);
-            passed = total.saturating_sub(fail_count + skip_count);
-            failed = fail_count;
+            summary = Some((total, fail_count, skip_count));
             continue;
         }
 
@@ -275,6 +286,7 @@ fn filter_gradle_test(output: &str) -> String {
             let status = &caps[3];
 
             if status == "FAILED" {
+                counted_failed += 1;
                 // Save previous failure if any
                 if let Some(f) = current_failure.take() {
                     failures.push(f);
@@ -287,6 +299,7 @@ fn filter_gradle_test(output: &str) -> String {
                 });
                 in_failure_block = true;
             } else {
+                counted_passed += 1;
                 in_failure_block = false;
             }
             continue;
@@ -326,6 +339,15 @@ fn filter_gradle_test(output: &str) -> String {
     if let Some(f) = current_failure.take() {
         failures.push(f);
     }
+
+    // Reconcile the two sources. The summary line is authoritative when
+    // present because it is the only one that reports skipped tests.
+    let (passed, failed) = match summary {
+        Some((total, fail_count, skip_count)) => {
+            (total.saturating_sub(fail_count + skip_count), fail_count)
+        }
+        None => (counted_passed, counted_failed),
+    };
 
     // Build output
     let total = passed + failed;
@@ -543,6 +565,46 @@ mod tests {
             savings,
             input_tokens,
             output_tokens
+        );
+    }
+
+    #[test]
+    fn test_green_run_without_summary_line_counts_passes() {
+        // Gradle emits "N tests completed, M failed" only as part of the Test
+        // task *failure* message, so a fully passing run has no summary line at
+        // all. Previously this reported "no tests found" for 3 green tests.
+        let input = "\
+> Task :app:test
+com.example.FooTest > testA PASSED
+com.example.FooTest > testB PASSED
+com.example.BarTest > testC PASSED
+
+BUILD SUCCESSFUL in 12s
+5 actionable tasks: 5 executed
+";
+        assert_eq!(filter_gradle_test(input), "Gradle test: 3 passed (12s)");
+    }
+
+    #[test]
+    fn test_summary_line_wins_over_tallied_lines() {
+        // When both are present the summary is authoritative: it is the only
+        // source that reports skipped tests, so 4 completed / 1 failed /
+        // 1 skipped must read as 2 passed even though 2 PASSED lines appear.
+        let input = "\
+com.example.FooTest > testA PASSED
+com.example.FooTest > testB PASSED
+com.example.FooTest > testC FAILED
+    java.lang.AssertionError: expected true but was false
+
+4 tests completed, 1 failed, 1 skipped
+
+BUILD FAILED in 9s
+";
+        let output = filter_gradle_test(input);
+        assert!(
+            output.starts_with("FAILED: 1/3 tests"),
+            "expected summary-derived counts, got: {}",
+            output
         );
     }
 
