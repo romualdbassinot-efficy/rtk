@@ -1,7 +1,14 @@
-//! Filters Maven build and test output with Surefire XML parser (70-90% token reduction).
+//! Filters Maven build and test output (70-90% token reduction).
 //!
 //! Strips Maven boilerplate, download progress, plugin headers, and
 //! shows only failures and summary for test runs.
+//!
+//! The test filter parses Surefire's **stdout** summary - the `Results:`
+//! blocks, the per-test `<<< FAILURE!` blocks and the `Failures:` section. It
+//! does not read `target/surefire-reports/*.xml`, so failures that never reach
+//! stdout (a forked-VM crash, `-q`, `redirectTestOutputToFile`) are not
+//! recovered here. An XML-backed pass over the report directory is a separate
+//! piece of work; see rtk-ai/rtk#2939.
 
 use crate::core::tracking;
 use crate::core::utils::{exit_code_from_output, resolved_command, strip_ansi, truncate};
