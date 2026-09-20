@@ -288,21 +288,19 @@ fn filter_mvn_build(output: &str) -> String {
             continue;
         }
 
-        // Keep stack trace context for errors
-        if !result_lines.is_empty()
-            && result_lines
-                .last()
-                .map_or(false, |l| l.starts_with("[ERROR]"))
-        {
-            if trimmed.starts_with("symbol:")
+        // Keep javac's continuation lines, but only directly under an error.
+        // `is_some_and` covers the empty case, so no length check is needed.
+        if result_lines
+            .last()
+            .is_some_and(|l| l.starts_with("[ERROR]"))
+            && (trimmed.starts_with("symbol:")
                 || trimmed.starts_with("location:")
                 || trimmed.starts_with("required:")
                 || trimmed.starts_with("found:")
-                || trimmed.starts_with("reason:")
-            {
-                result_lines.push(format!("  {}", trimmed));
-                continue;
-            }
+                || trimmed.starts_with("reason:"))
+        {
+            result_lines.push(format!("  {}", trimmed));
+            continue;
         }
     }
 
