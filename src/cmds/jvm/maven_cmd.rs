@@ -366,12 +366,16 @@ fn filter_mvn_test(output: &str) -> String {
                 let line_num = caps[2].to_string();
                 let message = caps[3].to_string();
 
-                failures.push(MavenTestFailure {
-                    test_name: compact_test_name(&method_path),
-                    message: truncate(&message, 120).to_string(),
-                    location: format!("{}:{}", method_path, line_num),
-                    stack_lines: Vec::new(),
-                });
+                upsert_failure(
+                    &mut failures,
+                    MavenTestFailure {
+                        test_name: compact_test_name(&method_path),
+                        fqn: String::new(),
+                        message: truncate(&message, 120).to_string(),
+                        location: format!("{}:{}", method_path, line_num),
+                        stack_lines: Vec::new(),
+                    },
+                );
                 continue;
             }
             // End of failures section
@@ -417,12 +421,7 @@ fn filter_mvn_test(output: &str) -> String {
         if FAILURE_DETAIL_RE.is_match(trimmed) {
             // Save previous failure
             if let Some(f) = current_failure.take() {
-                if failures
-                    .iter()
-                    .all(|existing| existing.test_name != f.test_name)
-                {
-                    failures.push(f);
-                }
+                upsert_failure(&mut failures, f);
             }
 
             let test_name = trimmed
@@ -433,6 +432,7 @@ fn filter_mvn_test(output: &str) -> String {
                 .to_string();
             current_failure = Some(MavenTestFailure {
                 test_name: compact_test_name(&test_name),
+                fqn: test_name.clone(),
                 message: String::new(),
                 location: String::new(),
                 stack_lines: Vec::new(),
@@ -475,12 +475,7 @@ fn filter_mvn_test(output: &str) -> String {
 
     // Save last failure
     if let Some(f) = current_failure.take() {
-        if failures
-            .iter()
-            .all(|existing| existing.test_name != f.test_name)
-        {
-            failures.push(f);
-        }
+        upsert_failure(&mut failures, f);
     }
 
     // No module summary was seen — a log level or Surefire version that omits
@@ -579,9 +574,45 @@ fn filter_mvn_test(output: &str) -> String {
 
 struct MavenTestFailure {
     test_name: String,
+    /// Fully-qualified name when the source line carried one. The per-test
+    /// `<<< FAILURE!` block does; the `Failures:` summary section does not, so
+    /// this is the only field that can tell two same-named tests in different
+    /// packages apart — and only when both sides supply it.
+    fqn: String,
     message: String,
     location: String,
     stack_lines: Vec<String>,
+}
+
+/// Merge a failure into the list, or add it if new.
+///
+/// Surefire reports the same failure through two channels - the per-test
+/// `<<< FAILURE!` block (message + stack) and the `Failures:` summary section
+/// (message + file:line) - and they appear in that order, so neither channel
+/// alone is complete and a plain push emits the test twice.
+fn upsert_failure(failures: &mut Vec<MavenTestFailure>, incoming: MavenTestFailure) {
+    let existing = failures.iter_mut().find(|f| {
+        f.test_name == incoming.test_name
+            && (f.fqn.is_empty() || incoming.fqn.is_empty() || f.fqn == incoming.fqn)
+    });
+
+    match existing {
+        Some(f) => {
+            if f.fqn.is_empty() {
+                f.fqn = incoming.fqn;
+            }
+            if f.message.is_empty() {
+                f.message = incoming.message;
+            }
+            if f.location.is_empty() {
+                f.location = incoming.location;
+            }
+            if f.stack_lines.is_empty() {
+                f.stack_lines = incoming.stack_lines;
+            }
+        }
+        None => failures.push(incoming),
+    }
 }
 
 /// Check if a line matches any noise pattern
@@ -790,6 +821,77 @@ mod tests {
             !output.contains("BUILD FAILURE"),
             "the error list replaces the bare status line"
         );
+    }
+
+    #[test]
+    fn test_each_failure_listed_once() {
+        // Surefire reports each failure twice: once in the per-test
+        // "<<< FAILURE!" block, once in the "Failures:" summary. The two must
+        // merge into one entry carrying both the message and the location.
+        let input = include_str!("../../../tests/fixtures/mvn_test_fail_raw.txt");
+        let output = filter_mvn_test(input);
+
+        assert_eq!(
+            output
+                .matches("UserServiceTest.testUpdateUserProfile FAILED")
+                .count(),
+            1,
+            "failure listed more than once:\n{}",
+            output
+        );
+        assert_eq!(
+            output.matches("FAILED\n").count(),
+            2,
+            "expected exactly 2 failure entries for 2 failures:\n{}",
+            output
+        );
+        // The merged entry keeps the summary's location and the block's message.
+        assert!(output.contains("Expected user name to be \"John Updated\" but was \"John\""));
+        assert!(output.contains("at UserServiceTest.testUpdateUserProfile:89"));
+    }
+
+    #[test]
+    fn test_same_method_name_in_two_packages_stays_distinct() {
+        // compact_test_name() drops the package, so both of these compact to
+        // "FooTest.testX". They are different tests and must not merge.
+        let mut failures = Vec::new();
+        upsert_failure(
+            &mut failures,
+            MavenTestFailure {
+                test_name: "FooTest.testX".to_string(),
+                fqn: "com.a.FooTest.testX".to_string(),
+                message: "a failed".to_string(),
+                location: String::new(),
+                stack_lines: Vec::new(),
+            },
+        );
+        upsert_failure(
+            &mut failures,
+            MavenTestFailure {
+                test_name: "FooTest.testX".to_string(),
+                fqn: "com.b.FooTest.testX".to_string(),
+                message: "b failed".to_string(),
+                location: String::new(),
+                stack_lines: Vec::new(),
+            },
+        );
+        assert_eq!(failures.len(), 2);
+
+        // Same test arriving from the two channels does merge: the summary
+        // channel carries no fqn, so it attaches to the existing entry.
+        upsert_failure(
+            &mut failures,
+            MavenTestFailure {
+                test_name: "FooTest.testX".to_string(),
+                fqn: String::new(),
+                message: String::new(),
+                location: "FooTest.testX:12".to_string(),
+                stack_lines: Vec::new(),
+            },
+        );
+        assert_eq!(failures.len(), 2);
+        assert_eq!(failures[0].location, "FooTest.testX:12");
+        assert_eq!(failures[0].message, "a failed");
     }
 
     #[test]
