@@ -776,6 +776,53 @@ mod tests {
     }
 
     #[test]
+    fn test_gradle_subcmd_savings_are_reachable() {
+        // The gradle rule used to capture the launcher in group 1, so
+        // registry.rs read "gradle" as the subcommand and every task fell back
+        // to the flat savings_pct - subcmd_savings was unreachable. These four
+        // must each report their own figure.
+        let savings = |cmd: &str| match classify_command(cmd) {
+            Classification::Supported {
+                estimated_savings_pct,
+                ..
+            } => estimated_savings_pct,
+            other => panic!("{} was not classified as supported: {:?}", cmd, other),
+        };
+
+        assert_eq!(savings("gradle test"), 88.0);
+        assert_eq!(savings("./gradlew test --info"), 88.0);
+        assert_eq!(savings("gradle build"), 80.0);
+        // Dependency reports are payload, not noise - nothing to claim.
+        assert_eq!(savings("gradle dependencies"), 0.0);
+        assert_eq!(savings("gradlew dependencyInsight --dependency junit"), 0.0);
+        // Any other task gets the same blacklist noise filter as `build`.
+        assert_eq!(savings("gradle assemble"), 80.0);
+    }
+
+    #[test]
+    fn test_mvn_rule_claims_only_filtered_goals() {
+        // clean, install and verify have no MavenCommands variant, so they
+        // reach run_other, which passes through. Claiming savings for them
+        // inflated the discover report.
+        assert_eq!(
+            classify_command("mvn test"),
+            Classification::Supported {
+                rtk_equivalent: "rtk mvn",
+                category: "Build",
+                estimated_savings_pct: 88.0,
+                status: RtkStatus::Existing,
+            }
+        );
+        for goal in ["mvn verify", "mvn install", "mvn clean"] {
+            assert!(
+                !matches!(classify_command(goal), Classification::Supported { .. }),
+                "{} is passthrough today and must not be claimed as supported",
+                goal
+            );
+        }
+    }
+
+    #[test]
     fn test_registry_covers_all_cargo_subcommands() {
         // Verify that every CargoCommand variant (Build, Test, Clippy, Check, Fmt)
         // except Other has a matching pattern in the registry

@@ -486,21 +486,42 @@ pub const RULES: &[RtkRule] = &[
         subcmd_status: &[],
     },
     RtkRule {
-        pattern: r"^mvn\s+(compile|package|clean|install|test|verify)\b",
+        // Only the goals that reach a filter are claimed. clean, install and
+        // verify have no MavenCommands variant, so they land in run_other,
+        // which passes through - claiming 75% for them inflated the report.
+        pattern: r"^mvn\s+(compile|package|test)\b",
         rtk_cmd: "rtk mvn",
         rewrite_prefixes: &["mvn"],
         category: "Build",
+        // Measured on tests/fixtures: compile 97.0%, test 94.8% (failing run)
+        // to 98.7% (passing run). Claimed conservatively.
         savings_pct: 75.0,
         subcmd_savings: &[("test", 88.0), ("compile", 75.0), ("package", 75.0)],
         subcmd_status: &[],
     },
     RtkRule {
-        pattern: r"^(gradle|gradlew|\./gradlew)\s+",
+        // Group 1 must be the task: registry.rs reads caps[1] as the
+        // subcommand for the subcmd_savings and subcmd_status lookups. While
+        // the launcher was the capturing group, subcmd_savings below could
+        // never match and every gradle task reported the flat savings_pct.
+        pattern: r"^(?:gradle|gradlew|\./gradlew)\s+(\S+)",
         rtk_cmd: "rtk gradle",
         rewrite_prefixes: &["gradle", "./gradlew", "gradlew"],
         category: "Build",
+        // Fallback for any other task. Unlike mvn, gradle's run_other applies
+        // the same blacklist noise filter as `build` (daemon lines, download
+        // progress, UP-TO-DATE/NO-SOURCE/FROM-CACHE tasks), so the figure
+        // carries over. Measured 83.2% on tests/fixtures; claimed at 80%.
         savings_pct: 80.0,
-        subcmd_savings: &[("test", 88.0), ("build", 80.0)],
+        subcmd_savings: &[
+            ("test", 88.0),
+            ("build", 80.0),
+            // Dependency reports are almost all payload: the blacklist filter
+            // strips daemon noise and keeps the tree, so there is no
+            // meaningful saving to claim here.
+            ("dependencies", 0.0),
+            ("dependencyInsight", 0.0),
+        ],
         subcmd_status: &[],
     },
     RtkRule {
