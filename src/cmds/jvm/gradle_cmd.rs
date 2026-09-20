@@ -4,7 +4,7 @@
 //! and shows only failures and summary for test runs.
 
 use crate::core::tracking;
-use crate::core::utils::{exit_code_from_output, resolved_command, truncate};
+use crate::core::utils::{exit_code_from_output, resolved_command, strip_ansi, truncate};
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -189,6 +189,11 @@ pub fn run_other(args: &[OsString], verbose: u8) -> Result<i32> {
 
 /// Filter Gradle build output: strip noise, keep errors and summary
 fn filter_gradle_build(output: &str) -> String {
+    // Strip ANSI first: every pattern below is ^-anchored, so a single
+    // colour escape would defeat the whole filter. Piped output is plain
+    // by default, but --console=rich, -Dstyle.color=always and many CI
+    // images force colour on.
+    let output = &strip_ansi(output);
     let mut result_lines: Vec<String> = Vec::new();
     let mut in_welcome_block = false;
 
@@ -232,6 +237,11 @@ fn filter_gradle_build(output: &str) -> String {
 
 /// Filter Gradle test output: show only failures and summary
 fn filter_gradle_test(output: &str) -> String {
+    // Strip ANSI first: every pattern below is ^-anchored, so a single
+    // colour escape would defeat the whole filter. Piped output is plain
+    // by default, but --console=rich, -Dstyle.color=always and many CI
+    // images force colour on.
+    let output = &strip_ansi(output);
     // Two independent sources of truth, and neither is always present:
     //
     //   per-test lines  "com.x.FooTest > testBar PASSED"   - only when the
@@ -476,6 +486,28 @@ mod tests {
         // Should strip noise
         assert!(!output.contains("Starting a Gradle Daemon"));
         assert!(!output.contains("UP-TO-DATE"));
+    }
+
+    #[test]
+    fn test_ansi_escapes_do_not_defeat_the_filters() {
+        // Colour is forced on by --console=rich, -Dstyle.color=always and many
+        // CI images. Every noise pattern is ^-anchored, so an unstripped escape
+        // at the start of a line would make the filter keep everything.
+        let coloured = "\x1b[1m> Task :app:compileJava UP-TO-DATE\x1b[0m\n\
+                        \x1b[32mBUILD SUCCESSFUL in 28s\x1b[0m\n\
+                        \x1b[1m14 actionable tasks: 14 executed\x1b[0m\n";
+        let output = filter_gradle_build(coloured);
+
+        assert!(!output.contains('\x1b'), "ANSI survived: {:?}", output);
+        assert!(
+            !output.contains("UP-TO-DATE"),
+            "noise line survived colouring: {:?}",
+            output
+        );
+        assert_eq!(
+            output,
+            "BUILD SUCCESSFUL in 28s\n14 actionable tasks: 14 executed"
+        );
     }
 
     #[test]
