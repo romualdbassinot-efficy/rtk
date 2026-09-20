@@ -315,6 +315,12 @@ fn filter_mvn_test(output: &str) -> String {
     let mut total_failures: usize = 0;
     let mut total_errors: usize = 0;
     let mut total_skipped: usize = 0;
+    // Per-class totals, used only as a fallback when a run prints no module
+    // summary at all (see the TEST_RESULT_RE branch below).
+    let mut class_run: usize = 0;
+    let mut class_failures: usize = 0;
+    let mut class_errors: usize = 0;
+    let mut class_skipped: usize = 0;
     let mut failures: Vec<MavenTestFailure> = Vec::new();
     let mut current_failure: Option<MavenTestFailure> = None;
     let mut in_failure_output = false;
@@ -369,21 +375,27 @@ fn filter_mvn_test(output: &str) -> String {
             }
         }
 
-        // Capture test result summary (last one wins — it's the global summary)
+        // Capture test result counts.
+        //
+        // Surefire emits two shapes of this line and they must not be mixed:
+        //   per-class  "[INFO] Tests run: 3, ... Time elapsed: 0.2 s -- in com.x.FooTest"
+        //   per-module "[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0"
+        // The per-class line carries a " -- in <Class>" suffix; the module
+        // summary inside each "Results:" block does not. A reactor prints one
+        // module summary per module, so the totals are the sum of those — never
+        // a single line, whichever arrives first.
         if let Some(caps) = TEST_RESULT_RE.captures(trimmed) {
             let run: usize = caps[1].parse().unwrap_or(0);
             let fail: usize = caps[2].parse().unwrap_or(0);
             let err: usize = caps[3].parse().unwrap_or(0);
             let skip: usize = caps[4].parse().unwrap_or(0);
 
-            // Only use the global summary (from [ERROR] or final [INFO] Results section)
-            if trimmed.starts_with("[ERROR]") {
-                total_run = run;
-                total_failures = fail;
-                total_errors = err;
-                total_skipped = skip;
-            } else if total_run == 0 {
-                // Accumulate from per-module summaries if no global yet
+            if trimmed.contains(" -- in ") {
+                class_run += run;
+                class_failures += fail;
+                class_errors += err;
+                class_skipped += skip;
+            } else {
                 total_run += run;
                 total_failures += fail;
                 total_errors += err;
@@ -460,6 +472,16 @@ fn filter_mvn_test(output: &str) -> String {
         {
             failures.push(f);
         }
+    }
+
+    // No module summary was seen — a log level or Surefire version that omits
+    // the "Results:" block. Fall back to the per-class lines rather than
+    // reporting zero tests for a run that clearly had some.
+    if total_run == 0 && class_run > 0 {
+        total_run = class_run;
+        total_failures = class_failures;
+        total_errors = class_errors;
+        total_skipped = class_skipped;
     }
 
     let total_failed = total_failures + total_errors;
@@ -629,9 +651,10 @@ mod tests {
         let input = include_str!("../../../tests/fixtures/mvn_test_pass_raw.txt");
         let output = filter_mvn_test(input);
 
-        assert!(output.contains("mvn test:"));
-        assert!(output.contains("passed"));
-        assert!(!output.contains("FAILED"));
+        // The fixture is a 2-module reactor: 6 tests in edeal-common, 14 in
+        // edeal-webapp. Assert the exact total — a `contains("passed")` here
+        // held just as well when the filter reported 3 of the 20.
+        assert_eq!(output, "mvn test: 20 passed (22.345 s)");
     }
 
     #[test]
@@ -639,10 +662,45 @@ mod tests {
         let input = include_str!("../../../tests/fixtures/mvn_test_fail_raw.txt");
         let output = filter_mvn_test(input);
 
-        assert!(output.contains("FAILED"));
-        assert!(output.contains("2/14") || output.contains("2 "));
-        // Should contain failure information
-        assert!(output.contains("testUpdateUserProfile") || output.contains("UserServiceTest"));
+        // 6 + 14 tests across the two modules, 2 failures in the second.
+        assert!(
+            output.starts_with("FAILED: 2/20 tests"),
+            "expected the reactor total, got: {}",
+            output
+        );
+        assert!(output.contains("UserServiceTest.testUpdateUserProfile"));
+        assert!(output.contains("RestControllerTest.testAuthRequired"));
+    }
+
+    #[test]
+    fn test_per_class_lines_do_not_become_the_total() {
+        // Regression guard for the first-match-wins bug: the per-class line
+        // ("-- in <Class>") must never be taken as the module total.
+        let input = "\
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.2 s -- in com.x.ATest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.3 s -- in com.x.BTest
+[INFO] Results:
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+";
+        assert_eq!(filter_mvn_test(input), "mvn test: 7 passed");
+    }
+
+    #[test]
+    fn test_per_class_fallback_when_no_module_summary() {
+        // No "Results:" block at all — the per-class lines are all there is,
+        // so they must be summed rather than reported as "no tests found".
+        let input = "\
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.2 s -- in com.x.ATest
+[INFO] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.3 s -- in com.x.BTest
+[INFO] BUILD FAILURE
+";
+        let output = filter_mvn_test(input);
+        assert!(
+            output.starts_with("FAILED: 1/7 tests"),
+            "expected per-class fallback totals, got: {}",
+            output
+        );
     }
 
     #[test]
