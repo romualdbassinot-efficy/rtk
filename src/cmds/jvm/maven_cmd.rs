@@ -187,8 +187,19 @@ pub fn run_other(args: &[OsString], verbose: u8) -> Result<i32> {
 
     let exit_code = exit_code_from_output(&output, "mvn");
 
-    // Apply basic noise stripping
-    let filtered = filter_mvn_build(&raw);
+    // Passthrough, ANSI-stripped only — deliberately NOT filter_mvn_build.
+    //
+    // filter_mvn_build is a whitelist: it keeps reactor lines, [ERROR],
+    // [WARNING], "Compiling N source files" and their continuation lines, and
+    // drops everything else. Any goal whose payload is none of those had its
+    // entire output erased — `mvn dependency:tree` returned just
+    // "BUILD SUCCESS (1.2 s)", and the same went for help:effective-pom,
+    // versions:*, and program output from exec:java. Deleting
+    // src/filters/mvn-build.toml removed the net that used to cover them.
+    //
+    // develop's mvn_cmd.rs routes the same set (clean, site, dependency:*,
+    // --version, --help, any unrecognised goal) to passthrough for this reason.
+    let filtered = strip_ansi(&raw);
 
     if let Some(hint) =
         crate::core::tee::tee_and_hint(&raw, &format!("mvn_{}", subcommand), exit_code)
@@ -698,6 +709,30 @@ mod tests {
         // Should strip noise
         assert!(!output.contains("Scanning for projects"));
         assert!(!output.contains("maven-resources-plugin"));
+    }
+
+    #[test]
+    fn test_build_filter_erases_dependency_tree_payload() {
+        // Documents WHY run_other passes through instead of calling this
+        // filter: filter_mvn_build is a whitelist, so a dependency tree - which
+        // is neither [ERROR], [WARNING], a reactor line nor "Compiling N" -
+        // survives none of it. If this ever stops holding, run_other can be
+        // reconsidered; until then passthrough is the only non-destructive
+        // option for unrecognised goals.
+        let tree = "\
+[INFO] --- maven-dependency-plugin:3.6.0:tree (default-cli) @ app ---
+[INFO] com.example:app:jar:1.0.0
+[INFO] +- org.springframework:spring-core:jar:5.3.0:compile
+[INFO] |  \\- org.springframework:spring-jcl:jar:5.3.0:compile
+[INFO] \\- junit:junit:jar:4.13.2:test
+[INFO] BUILD SUCCESS
+[INFO] Total time:  1.234 s
+";
+        assert_eq!(filter_mvn_build(tree), "BUILD SUCCESS (1.234 s)");
+        assert!(!filter_mvn_build(tree).contains("spring-core"));
+
+        // Passthrough keeps it, which is what run_other now does.
+        assert!(strip_ansi(tree).contains("spring-core"));
     }
 
     #[test]
