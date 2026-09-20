@@ -1,0 +1,32 @@
+---
+source: src/cmds/jvm/gradle_cmd.rs
+expression: filter_gradle_build(input)
+---
+> Task :app-web:compileJava FAILED
+FAILURE: Build failed with an exception.
+* What went wrong:
+Execution failed for task ':app-web:compileJava'.
+> Compilation failed; see the compiler error output for details.
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+> Task :app-web:compileJava
+/home/dev/app/app-web/src/main/java/com/example/app/UserService.java:42: error: cannot find symbol
+return userRepository.findByEmail(email);
+^
+symbol:   method findByEmail(String)
+location: variable userRepository of type UserRepository
+/home/dev/app/app-web/src/main/java/com/example/app/UserService.java:58: error: method login in class AuthManager cannot be applied to given types;
+authManager.login(user, password, rememberMe);
+^
+required: User, String
+found:    User, String, boolean
+reason: actual and formal argument lists differ in length
+/home/dev/app/app-web/src/main/java/com/example/app/api/RestController.java:23: error: package javax.ws.rs does not exist
+import javax.ws.rs.GET;
+^
+3 errors
+BUILD FAILED in 12s
+5 actionable tasks: 1 executed, 4 up-to-date

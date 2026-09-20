@@ -1,0 +1,6 @@
+---
+source: src/cmds/jvm/maven_cmd.rs
+expression: filter_mvn_build(input)
+---
+[INFO] Compiling 342 source files to /home/dev/app/app-web/target/classes
+BUILD SUCCESS (18.234 s)

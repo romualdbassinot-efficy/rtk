@@ -1,0 +1,5 @@
+---
+source: src/cmds/jvm/maven_cmd.rs
+expression: filter_mvn_test(input)
+---
+mvn test: 20 passed (22.345 s)

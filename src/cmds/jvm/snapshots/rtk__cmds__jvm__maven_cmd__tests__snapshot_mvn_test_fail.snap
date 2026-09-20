@@ -1,0 +1,14 @@
+---
+source: src/cmds/jvm/maven_cmd.rs
+expression: filter_mvn_test(input)
+---
+FAILED: 2/20 tests (22.345 s)
+=======================================
+  UserServiceTest.testUpdateUserProfile FAILED
+    Expected user name to be "John Updated" but was "John"
+    at UserServiceTest.testUpdateUserProfile:89
+  RestControllerTest.testAuthRequired FAILED
+    Expected status code 401 but was 200
+    at RestControllerTest.testAuthRequired:67
+
+BUILD FAILURE

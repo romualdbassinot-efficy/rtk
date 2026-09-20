@@ -1,0 +1,5 @@
+---
+source: src/cmds/jvm/gradle_cmd.rs
+expression: filter_gradle_test(input)
+---
+Gradle test: 20 passed (45s)

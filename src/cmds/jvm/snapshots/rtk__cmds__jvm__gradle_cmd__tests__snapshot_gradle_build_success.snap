@@ -1,0 +1,10 @@
+---
+source: src/cmds/jvm/gradle_cmd.rs
+expression: filter_gradle_build(input)
+---
+> Task :app-web:compileJava
+> Task :app-web:classes
+> Task :app-web:war
+> Task :app-web:assemble
+BUILD SUCCESSFUL in 28s
+14 actionable tasks: 3 executed, 11 up-to-date

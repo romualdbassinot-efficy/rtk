@@ -1,0 +1,12 @@
+---
+source: src/cmds/jvm/gradle_cmd.rs
+expression: filter_gradle_test(input)
+---
+FAILED: 2/20 tests (42s)
+=======================================
+  UserServiceTest > testUpdateUserProfile() FAILED
+    java.lang.AssertionError: Expected user name to be "John Updated" but was "John"
+  RestControllerTest > testAuthRequired() FAILED
+    java.lang.AssertionError: Expected status code 401 but was 200
+
+BUILD FAILED
