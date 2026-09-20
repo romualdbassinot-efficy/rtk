@@ -47,19 +47,35 @@ lazy_static! {
 /// `max_lines = 50` of the TOML filters these modules replaced.
 const MAX_BODY_LINES: usize = 50;
 
-/// Detect whether to use ./gradlew or gradle
-fn gradle_command() -> std::process::Command {
-    // Prefer ./gradlew wrapper if it exists in current directory
-    let gradlew = if cfg!(windows) {
+/// Name of the Gradle wrapper script on this platform.
+fn wrapper_file_name() -> &'static str {
+    if cfg!(windows) {
         "gradlew.bat"
     } else {
-        "./gradlew"
-    };
+        "gradlew"
+    }
+}
 
-    if std::path::Path::new(gradlew).exists() {
-        resolved_command(gradlew)
-    } else {
-        resolved_command("gradle")
+/// The wrapper inside `dir`, if it is there.
+///
+/// Always returns a path with an explicit directory component. Both
+/// `std::process::Command` and the Windows loader treat a bare file name as a
+/// PATH lookup, and the wrapper lives in the project directory, never on PATH.
+fn wrapper_in(dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    let candidate = dir.join(wrapper_file_name());
+    candidate.exists().then_some(candidate)
+}
+
+/// Detect whether to use the project's gradle wrapper or gradle from PATH.
+fn gradle_command() -> std::process::Command {
+    match wrapper_in(std::path::Path::new(".")) {
+        // Built from the path directly, not via resolved_command(): that
+        // resolves through PATH, which cannot find a wrapper sitting in the
+        // project directory. On Windows the failed lookup made
+        // resolved_command print "rtk: Failed to resolve 'gradlew.bat' via
+        // PATH, falling back to direct exec" on every single invocation.
+        Some(path) => std::process::Command::new(path),
+        None => resolved_command("gradle"),
     }
 }
 
@@ -721,6 +737,33 @@ BUILD FAILED in 9s
     // ============================================================
     // Utility tests
     // ============================================================
+
+    #[test]
+    fn test_wrapper_lookup_returns_a_path_not_a_bare_name() {
+        // A bare file name is a PATH lookup for both Command and the Windows
+        // loader, and the wrapper is never on PATH. The returned value must
+        // therefore always carry a directory component.
+        let dir = std::env::temp_dir().join(format!("rtk-gradlew-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+
+        assert!(
+            wrapper_in(&dir).is_none(),
+            "no wrapper present yet, must not be claimed"
+        );
+
+        let wrapper = dir.join(wrapper_file_name());
+        std::fs::write(&wrapper, b"#!/bin/sh\n").expect("write wrapper");
+
+        let found = wrapper_in(&dir).expect("wrapper should be found");
+        assert_eq!(found, wrapper);
+        assert!(
+            found.parent().is_some_and(|p| !p.as_os_str().is_empty()),
+            "wrapper path has no directory component: {:?}",
+            found
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
 
     #[test]
     fn test_compact_class_name() {
