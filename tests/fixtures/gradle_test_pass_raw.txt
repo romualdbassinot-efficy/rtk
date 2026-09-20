@@ -1,45 +1,45 @@
 Starting a Gradle Daemon (subsequent builds will be faster)
 
 > Configure project :
-> Configure project :edeal-common
-> Configure project :edeal-webapp
+> Configure project :app-core
+> Configure project :app-web
 
-> Task :edeal-common:compileJava UP-TO-DATE
-> Task :edeal-common:processResources UP-TO-DATE
-> Task :edeal-common:classes UP-TO-DATE
-> Task :edeal-common:jar UP-TO-DATE
-> Task :edeal-webapp:compileJava UP-TO-DATE
-> Task :edeal-webapp:processResources UP-TO-DATE
-> Task :edeal-webapp:classes UP-TO-DATE
-> Task :edeal-webapp:compileTestJava UP-TO-DATE
-> Task :edeal-webapp:processTestResources NO-SOURCE
-> Task :edeal-webapp:testClasses UP-TO-DATE
-> Task :edeal-webapp:test
+> Task :app-core:compileJava UP-TO-DATE
+> Task :app-core:processResources UP-TO-DATE
+> Task :app-core:classes UP-TO-DATE
+> Task :app-core:jar UP-TO-DATE
+> Task :app-web:compileJava UP-TO-DATE
+> Task :app-web:processResources UP-TO-DATE
+> Task :app-web:classes UP-TO-DATE
+> Task :app-web:compileTestJava UP-TO-DATE
+> Task :app-web:processTestResources NO-SOURCE
+> Task :app-web:testClasses UP-TO-DATE
+> Task :app-web:test
 
-com.edeal.frontline.UserServiceTest > testGetUserByEmail PASSED
-com.edeal.frontline.UserServiceTest > testCreateUser PASSED
-com.edeal.frontline.UserServiceTest > testDeleteUser PASSED
-com.edeal.frontline.UserServiceTest > testUpdateUserProfile PASSED
-com.edeal.frontline.api.RestControllerTest > testGetEndpoint PASSED
-com.edeal.frontline.api.RestControllerTest > testPostEndpoint PASSED
-com.edeal.frontline.api.RestControllerTest > testAuthRequired PASSED
-com.edeal.frontline.api.RestControllerTest > testPagination PASSED
-com.edeal.frontline.repository.UserRepositoryTest > testFindById PASSED
-com.edeal.frontline.repository.UserRepositoryTest > testFindByEmail PASSED
-com.edeal.frontline.repository.UserRepositoryTest > testSaveAndFlush PASSED
-com.edeal.frontline.service.EmailServiceTest > testSendEmail PASSED
-com.edeal.frontline.service.EmailServiceTest > testSendBulkEmail PASSED
-com.edeal.frontline.service.EmailServiceTest > testTemplateRendering PASSED
-com.edeal.frontline.util.DateUtilsTest > testFormatDate PASSED
-com.edeal.frontline.util.DateUtilsTest > testParseDate PASSED
-com.edeal.frontline.util.DateUtilsTest > testTimezoneConversion PASSED
-com.edeal.frontline.util.StringUtilsTest > testTruncate PASSED
-com.edeal.frontline.util.StringUtilsTest > testSanitizeHtml PASSED
-com.edeal.frontline.util.StringUtilsTest > testNormalize PASSED
+com.example.app.UserServiceTest > testGetUserByEmail PASSED
+com.example.app.UserServiceTest > testCreateUser PASSED
+com.example.app.UserServiceTest > testDeleteUser PASSED
+com.example.app.UserServiceTest > testUpdateUserProfile PASSED
+com.example.app.api.RestControllerTest > testGetEndpoint PASSED
+com.example.app.api.RestControllerTest > testPostEndpoint PASSED
+com.example.app.api.RestControllerTest > testAuthRequired PASSED
+com.example.app.api.RestControllerTest > testPagination PASSED
+com.example.app.repository.UserRepositoryTest > testFindById PASSED
+com.example.app.repository.UserRepositoryTest > testFindByEmail PASSED
+com.example.app.repository.UserRepositoryTest > testSaveAndFlush PASSED
+com.example.app.service.EmailServiceTest > testSendEmail PASSED
+com.example.app.service.EmailServiceTest > testSendBulkEmail PASSED
+com.example.app.service.EmailServiceTest > testTemplateRendering PASSED
+com.example.app.util.DateUtilsTest > testFormatDate PASSED
+com.example.app.util.DateUtilsTest > testParseDate PASSED
+com.example.app.util.DateUtilsTest > testTimezoneConversion PASSED
+com.example.app.util.StringUtilsTest > testTruncate PASSED
+com.example.app.util.StringUtilsTest > testSanitizeHtml PASSED
+com.example.app.util.StringUtilsTest > testNormalize PASSED
 
 20 tests completed, 0 failed
 
-> Task :edeal-webapp:check UP-TO-DATE
+> Task :app-web:check UP-TO-DATE
 
 BUILD SUCCESSFUL in 45s
 14 actionable tasks: 1 executed, 13 up-to-date

@@ -2,93 +2,93 @@
 [INFO] ------------------------------------------------------------------------
 [INFO] Reactor Build Order:
 [INFO]
-[INFO] E-DEAL Parent                                                      [pom]
-[INFO] edeal-common                                                       [jar]
-[INFO] edeal-webapp                                                       [war]
+[INFO] Example App Parent                                                      [pom]
+[INFO] app-core                                                       [jar]
+[INFO] app-web                                                       [war]
 [INFO]
-[INFO] ----------------< com.edeal.frontline:edeal-parent >----------------
-[INFO] Building E-DEAL Parent 2027-000-SNAPSHOT                           [1/3]
+[INFO] ----------------< com.example.app:app-parent >----------------
+[INFO] Building Example App Parent 1.0.0-SNAPSHOT                           [1/3]
 [INFO]   from pom.xml
 [INFO] --------------------------------[ pom ]---------------------------------
 [INFO]
-[INFO] ----------------< com.edeal.frontline:edeal-common >----------------
-[INFO] Building edeal-common 2027-000-SNAPSHOT                            [2/3]
-[INFO]   from edeal-common/pom.xml
+[INFO] ----------------< com.example.app:app-core >----------------
+[INFO] Building app-core 1.0.0-SNAPSHOT                            [2/3]
+[INFO]   from app-core/pom.xml
 [INFO] --------------------------------[ jar ]---------------------------------
 [INFO]
-[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ edeal-common ---
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ app-core ---
 [INFO] Copying 12 resources from src/main/resources to target/classes
 [INFO]
-[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ edeal-common ---
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ app-core ---
 [INFO] Nothing to compile - all classes are up to date.
 [INFO]
-[INFO] --- maven-resources-plugin:3.3.1:testResources (default-testResources) @ edeal-common ---
+[INFO] --- maven-resources-plugin:3.3.1:testResources (default-testResources) @ app-core ---
 [INFO] Copying 3 resources from src/test/resources to target/test-classes
 [INFO]
-[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ edeal-common ---
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ app-core ---
 [INFO] Nothing to compile - all classes are up to date.
 [INFO]
-[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ edeal-common ---
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ app-core ---
 [INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
 [INFO]
 [INFO] -------------------------------------------------------
 [INFO]  T E S T S
 [INFO] -------------------------------------------------------
-[INFO] Running com.edeal.frontline.util.DateUtilsTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.234 s -- in com.edeal.frontline.util.DateUtilsTest
-[INFO] Running com.edeal.frontline.util.StringUtilsTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s -- in com.edeal.frontline.util.StringUtilsTest
+[INFO] Running com.example.app.util.DateUtilsTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.234 s -- in com.example.app.util.DateUtilsTest
+[INFO] Running com.example.app.util.StringUtilsTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s -- in com.example.app.util.StringUtilsTest
 [INFO]
 [INFO] Results:
 [INFO]
 [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
 [INFO]
 [INFO]
-[INFO] ----------------< com.edeal.frontline:edeal-webapp >----------------
-[INFO] Building edeal-webapp 2027-000-SNAPSHOT                            [3/3]
-[INFO]   from edeal-webapp/pom.xml
+[INFO] ----------------< com.example.app:app-web >----------------
+[INFO] Building app-web 1.0.0-SNAPSHOT                            [3/3]
+[INFO]   from app-web/pom.xml
 [INFO] --------------------------------[ war ]---------------------------------
 [INFO]
-[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ edeal-webapp ---
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ app-web ---
 [INFO] Copying 45 resources from src/main/resources to target/classes
 [INFO]
-[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ edeal-webapp ---
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ app-web ---
 [INFO] Nothing to compile - all classes are up to date.
 [INFO]
-[INFO] --- maven-resources-plugin:3.3.1:testResources (default-testResources) @ edeal-webapp ---
+[INFO] --- maven-resources-plugin:3.3.1:testResources (default-testResources) @ app-web ---
 [INFO] Copying 5 resources from src/test/resources to target/test-classes
 [INFO]
-[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ edeal-webapp ---
+[INFO] --- maven-compiler-plugin:3.11.0:testCompile (default-testCompile) @ app-web ---
 [INFO] Nothing to compile - all classes are up to date.
 [INFO]
-[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ edeal-webapp ---
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ app-web ---
 [INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
 [INFO]
 [INFO] -------------------------------------------------------
 [INFO]  T E S T S
 [INFO] -------------------------------------------------------
-[INFO] Running com.edeal.frontline.UserServiceTest
-[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.234 s <<< FAILURE! -- in com.edeal.frontline.UserServiceTest
-[ERROR] com.edeal.frontline.UserServiceTest.testUpdateUserProfile -- Time elapsed: 0.089 s <<< FAILURE!
+[INFO] Running com.example.app.UserServiceTest
+[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.234 s <<< FAILURE! -- in com.example.app.UserServiceTest
+[ERROR] com.example.app.UserServiceTest.testUpdateUserProfile -- Time elapsed: 0.089 s <<< FAILURE!
 java.lang.AssertionError: Expected user name to be "John Updated" but was "John"
 	at org.junit.Assert.assertEquals(Assert.java:117)
-	at com.edeal.frontline.UserServiceTest.testUpdateUserProfile(UserServiceTest.java:89)
+	at com.example.app.UserServiceTest.testUpdateUserProfile(UserServiceTest.java:89)
 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
 	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
 
-[INFO] Running com.edeal.frontline.api.RestControllerTest
-[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 2.345 s <<< FAILURE! -- in com.edeal.frontline.api.RestControllerTest
-[ERROR] com.edeal.frontline.api.RestControllerTest.testAuthRequired -- Time elapsed: 0.045 s <<< FAILURE!
+[INFO] Running com.example.app.api.RestControllerTest
+[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 2.345 s <<< FAILURE! -- in com.example.app.api.RestControllerTest
+[ERROR] com.example.app.api.RestControllerTest.testAuthRequired -- Time elapsed: 0.045 s <<< FAILURE!
 java.lang.AssertionError: Expected status code 401 but was 200
 	at org.junit.Assert.assertEquals(Assert.java:117)
-	at com.edeal.frontline.api.RestControllerTest.testAuthRequired(RestControllerTest.java:67)
+	at com.example.app.api.RestControllerTest.testAuthRequired(RestControllerTest.java:67)
 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
 
-[INFO] Running com.edeal.frontline.repository.UserRepositoryTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.567 s -- in com.edeal.frontline.repository.UserRepositoryTest
-[INFO] Running com.edeal.frontline.service.EmailServiceTest
-[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.345 s -- in com.edeal.frontline.service.EmailServiceTest
+[INFO] Running com.example.app.repository.UserRepositoryTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.567 s -- in com.example.app.repository.UserRepositoryTest
+[INFO] Running com.example.app.service.EmailServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.345 s -- in com.example.app.service.EmailServiceTest
 [INFO]
 [INFO] Results:
 [INFO]
@@ -99,20 +99,20 @@ java.lang.AssertionError: Expected status code 401 but was 200
 [ERROR] Tests run: 14, Failures: 2, Errors: 0, Skipped: 0
 [INFO]
 [INFO] ------------------------------------------------------------------------
-[INFO] Reactor Summary for E-DEAL Parent 2027-000-SNAPSHOT:
+[INFO] Reactor Summary for Example App Parent 1.0.0-SNAPSHOT:
 [INFO]
-[INFO] E-DEAL Parent ...................................... SUCCESS [  0.234 s]
-[INFO] edeal-common ....................................... SUCCESS [  3.456 s]
-[INFO] edeal-webapp ....................................... FAILURE [ 15.678 s]
+[INFO] Example App Parent ...................................... SUCCESS [  0.234 s]
+[INFO] app-core ....................................... SUCCESS [  3.456 s]
+[INFO] app-web ....................................... FAILURE [ 15.678 s]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD FAILURE
 [INFO] ------------------------------------------------------------------------
 [INFO] Total time:  22.345 s
 [INFO] Finished at: 2026-03-21T10:30:00+01:00
 [INFO] ------------------------------------------------------------------------
-[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project edeal-webapp: There are test failures.
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project app-web: There are test failures.
 [ERROR]
-[ERROR] Please refer to /home/dev/e-deal/edeal-webapp/target/surefire-reports for the individual test results.
+[ERROR] Please refer to /home/dev/app/app-web/target/surefire-reports for the individual test results.
 [ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
 [ERROR] -> [Help 1]
 [ERROR]

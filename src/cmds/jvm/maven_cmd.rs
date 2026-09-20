@@ -654,7 +654,7 @@ fn is_noise_line(line: &str) -> bool {
     NOISE_RE.is_match(line)
 }
 
-/// Compact test name: "com.edeal.frontline.UserServiceTest.testFoo" -> "UserServiceTest.testFoo"
+/// Compact test name: "com.example.app.UserServiceTest.testFoo" -> "UserServiceTest.testFoo"
 fn compact_test_name(name: &str) -> String {
     let parts: Vec<&str> = name.rsplitn(3, '.').collect();
     if parts.len() >= 2 {
@@ -804,8 +804,8 @@ mod tests {
         let input = include_str!("../../../tests/fixtures/mvn_test_pass_raw.txt");
         let output = filter_mvn_test(input);
 
-        // The fixture is a 2-module reactor: 6 tests in edeal-common, 14 in
-        // edeal-webapp. Assert the exact total — a `contains("passed")` here
+        // The fixture is a 2-module reactor: 6 tests in app-core, 14 in
+        // app-web. Assert the exact total — a `contains("passed")` here
         // held just as well when the filter reported 3 of the 20.
         assert_eq!(output, "mvn test: 20 passed (22.345 s)");
     }
@@ -1032,7 +1032,7 @@ mod tests {
     #[test]
     fn test_compact_test_name() {
         assert_eq!(
-            compact_test_name("com.edeal.frontline.UserServiceTest.testFoo"),
+            compact_test_name("com.example.app.UserServiceTest.testFoo"),
             "UserServiceTest.testFoo"
         );
         assert_eq!(

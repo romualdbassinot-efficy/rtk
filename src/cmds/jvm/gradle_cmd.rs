@@ -480,7 +480,7 @@ fn is_noise_line(line: &str) -> bool {
     NOISE_RE.is_match(line)
 }
 
-/// Compact class name: "com.edeal.frontline.UserServiceTest" -> "UserServiceTest"
+/// Compact class name: "com.example.app.UserServiceTest" -> "UserServiceTest"
 fn compact_class_name(class: &str) -> String {
     if let Some(pos) = class.rfind('.') {
         class[pos + 1..].to_string()
@@ -769,7 +769,7 @@ BUILD FAILED in 9s
     #[test]
     fn test_compact_class_name() {
         assert_eq!(
-            compact_class_name("com.edeal.frontline.UserServiceTest"),
+            compact_class_name("com.example.app.UserServiceTest"),
             "UserServiceTest"
         );
         assert_eq!(compact_class_name("SimpleTest"), "SimpleTest");

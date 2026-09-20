@@ -1,18 +1,18 @@
 Starting a Gradle Daemon (subsequent builds will be faster)
 
 > Configure project :
-> Configure project :edeal-common
+> Configure project :app-core
 
-> Task :edeal-common:compileJava UP-TO-DATE
-> Task :edeal-common:processResources UP-TO-DATE
-> Task :edeal-common:classes UP-TO-DATE
-> Task :edeal-common:jar UP-TO-DATE
-> Task :edeal-webapp:compileJava FAILED
+> Task :app-core:compileJava UP-TO-DATE
+> Task :app-core:processResources UP-TO-DATE
+> Task :app-core:classes UP-TO-DATE
+> Task :app-core:jar UP-TO-DATE
+> Task :app-web:compileJava FAILED
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':edeal-webapp:compileJava'.
+Execution failed for task ':app-web:compileJava'.
 > Compilation failed; see the compiler error output for details.
 
 * Try:
@@ -24,19 +24,19 @@ Execution failed for task ':edeal-webapp:compileJava'.
 BUILD FAILED in 12s
 5 actionable tasks: 1 executed, 4 up-to-date
 
-> Task :edeal-webapp:compileJava
-/home/dev/e-deal/edeal-webapp/src/main/java/com/edeal/frontline/UserService.java:42: error: cannot find symbol
+> Task :app-web:compileJava
+/home/dev/app/app-web/src/main/java/com/example/app/UserService.java:42: error: cannot find symbol
         return userRepository.findByEmail(email);
                              ^
   symbol:   method findByEmail(String)
   location: variable userRepository of type UserRepository
-/home/dev/e-deal/edeal-webapp/src/main/java/com/edeal/frontline/UserService.java:58: error: method login in class AuthManager cannot be applied to given types;
+/home/dev/app/app-web/src/main/java/com/example/app/UserService.java:58: error: method login in class AuthManager cannot be applied to given types;
         authManager.login(user, password, rememberMe);
                    ^
   required: User, String
   found:    User, String, boolean
   reason: actual and formal argument lists differ in length
-/home/dev/e-deal/edeal-webapp/src/main/java/com/edeal/frontline/api/RestController.java:23: error: package javax.ws.rs does not exist
+/home/dev/app/app-web/src/main/java/com/example/app/api/RestController.java:23: error: package javax.ws.rs does not exist
 import javax.ws.rs.GET;
                   ^
 3 errors

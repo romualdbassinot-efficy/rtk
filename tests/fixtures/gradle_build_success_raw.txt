@@ -13,26 +13,26 @@ For more details see https://docs.gradle.org/9.1.0/release-notes.html
 Starting a Gradle Daemon (subsequent builds will be faster)
 
 > Configure project :
-> Configure project :edeal-common
-> Configure project :edeal-webapp
+> Configure project :app-core
+> Configure project :app-web
 
-> Task :edeal-common:compileJava UP-TO-DATE
-> Task :edeal-common:processResources UP-TO-DATE
-> Task :edeal-common:classes UP-TO-DATE
-> Task :edeal-common:jar UP-TO-DATE
-> Task :edeal-webapp:compileJava
+> Task :app-core:compileJava UP-TO-DATE
+> Task :app-core:processResources UP-TO-DATE
+> Task :app-core:classes UP-TO-DATE
+> Task :app-core:jar UP-TO-DATE
+> Task :app-web:compileJava
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
-> Task :edeal-webapp:processResources UP-TO-DATE
-> Task :edeal-webapp:classes
-> Task :edeal-webapp:war
-> Task :edeal-webapp:assemble
-> Task :edeal-common:compileTestJava NO-SOURCE
-> Task :edeal-webapp:compileTestJava UP-TO-DATE
-> Task :edeal-webapp:processTestResources NO-SOURCE
-> Task :edeal-webapp:testClasses UP-TO-DATE
-> Task :edeal-webapp:test UP-TO-DATE
-> Task :edeal-webapp:check UP-TO-DATE
+> Task :app-web:processResources UP-TO-DATE
+> Task :app-web:classes
+> Task :app-web:war
+> Task :app-web:assemble
+> Task :app-core:compileTestJava NO-SOURCE
+> Task :app-web:compileTestJava UP-TO-DATE
+> Task :app-web:processTestResources NO-SOURCE
+> Task :app-web:testClasses UP-TO-DATE
+> Task :app-web:test UP-TO-DATE
+> Task :app-web:check UP-TO-DATE
 
 BUILD SUCCESSFUL in 28s
 14 actionable tasks: 3 executed, 11 up-to-date
