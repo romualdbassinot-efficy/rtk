@@ -37,7 +37,15 @@ lazy_static! {
     // Compiler error line (file:line: error:)
     static ref COMPILER_ERROR_RE: Regex =
         Regex::new(r"^.+\.java:\d+:.*error:").unwrap();
+
+    // Build verdict and the task tally that follows it
+    static ref VERDICT_RE: Regex =
+        Regex::new(r"^(?:BUILD (?:SUCCESSFUL|FAILED)\b|\d+ actionable tasks?:)").unwrap();
 }
+
+/// Maximum body lines kept by the build filters before truncation, matching the
+/// `max_lines = 50` of the TOML filters these modules replaced.
+const MAX_BODY_LINES: usize = 50;
 
 /// Detect whether to use ./gradlew or gradle
 fn gradle_command() -> std::process::Command {
@@ -195,6 +203,11 @@ fn filter_gradle_build(output: &str) -> String {
     // images force colour on.
     let output = &strip_ansi(output);
     let mut result_lines: Vec<String> = Vec::new();
+    // The build verdict is hoisted out of the body so the cap below can never
+    // drop it. It is not reliably the last thing in the input either: stdout
+    // and stderr are concatenated, so "BUILD FAILED" arrives before the
+    // compiler errors that explain it.
+    let mut verdict_lines: Vec<String> = Vec::new();
     let mut in_welcome_block = false;
 
     for line in output.lines() {
@@ -223,15 +236,31 @@ fn filter_gradle_build(output: &str) -> String {
             continue;
         }
 
+        if VERDICT_RE.is_match(trimmed) {
+            verdict_lines.push(trimmed.to_string());
+            continue;
+        }
+
         // Keep task lines that actually ran (not UP-TO-DATE/NO-SOURCE/FROM-CACHE)
         // Keep error lines, build status, task counts
         result_lines.push(truncate(trimmed, 150).to_string());
     }
 
-    if result_lines.is_empty() {
+    if result_lines.is_empty() && verdict_lines.is_empty() {
         return "Gradle build: ok".to_string();
     }
 
+    // Cap the body. This filter is a blacklist - it keeps every line that is
+    // not known noise - so a large multi-module build's executed-task lines and
+    // javac warnings all qualify and there is otherwise no bound at all. The
+    // deleted src/filters/gradle.toml had max_lines = 50.
+    if result_lines.len() > MAX_BODY_LINES {
+        let dropped = result_lines.len() - MAX_BODY_LINES;
+        result_lines.truncate(MAX_BODY_LINES);
+        result_lines.push(format!("... +{} more lines", dropped));
+    }
+
+    result_lines.extend(verdict_lines);
     result_lines.join("\n")
 }
 
@@ -486,6 +515,34 @@ mod tests {
         // Should strip noise
         assert!(!output.contains("Starting a Gradle Daemon"));
         assert!(!output.contains("UP-TO-DATE"));
+    }
+
+    #[test]
+    fn test_build_body_is_capped_and_verdict_survives() {
+        // A blacklist filter keeps every non-noise line, so a large build is
+        // unbounded. Cap the body at MAX_BODY_LINES, and never let the cap eat
+        // the verdict - which is not last in the input, because stdout and
+        // stderr are concatenated.
+        let mut input = String::new();
+        input.push_str("BUILD FAILED in 3m 12s\n");
+        input.push_str("120 actionable tasks: 120 executed\n");
+        for i in 0..200 {
+            input.push_str(&format!("> Task :mod{}:compileJava\n", i));
+        }
+        let output = filter_gradle_build(&input);
+        let lines: Vec<&str> = output.lines().collect();
+
+        assert_eq!(
+            lines.len(),
+            MAX_BODY_LINES + 3,
+            "body + marker + 2 verdict lines"
+        );
+        assert_eq!(lines[MAX_BODY_LINES], "... +150 more lines");
+        assert_eq!(lines[MAX_BODY_LINES + 1], "BUILD FAILED in 3m 12s");
+        assert_eq!(
+            lines[MAX_BODY_LINES + 2],
+            "120 actionable tasks: 120 executed"
+        );
     }
 
     #[test]

@@ -63,6 +63,10 @@ lazy_static! {
         Regex::new(r"^\[INFO\] Compiling \d+ source files").unwrap();
 }
 
+/// Maximum body lines kept by the build filter before truncation, matching the
+/// `max_lines = 50` of the TOML filter this module replaced.
+const MAX_BODY_LINES: usize = 50;
+
 pub fn run_test(args: &[String], verbose: u8) -> Result<i32> {
     let timer = tracking::TimedExecution::start();
 
@@ -289,6 +293,17 @@ fn filter_mvn_build(output: &str) -> String {
                 continue;
             }
         }
+    }
+
+    // Cap the body before the footer is appended, so the BUILD verdict always
+    // survives truncation. Real reactors emit warnings in bulk - platform
+    // encoding, deprecation and unchecked notes per file, plugin-version
+    // warnings per module - and every one of them was kept unconditionally.
+    // The deleted src/filters/mvn-build.toml had max_lines = 50.
+    if result_lines.len() > MAX_BODY_LINES {
+        let dropped = result_lines.len() - MAX_BODY_LINES;
+        result_lines.truncate(MAX_BODY_LINES);
+        result_lines.push(format!("... +{} more lines", dropped));
     }
 
     // Build summary footer
@@ -683,6 +698,28 @@ mod tests {
         // Should strip noise
         assert!(!output.contains("Scanning for projects"));
         assert!(!output.contains("maven-resources-plugin"));
+    }
+
+    #[test]
+    fn test_build_body_is_capped_and_verdict_survives() {
+        // Every [WARNING] was kept unconditionally with no bound. Cap the body,
+        // and keep the BUILD footer outside the cap.
+        let mut input = String::new();
+        for i in 0..200 {
+            input.push_str(&format!(
+                "[WARNING] /src/main/java/A{}.java: uses unchecked operations\n",
+                i
+            ));
+        }
+        input.push_str("[INFO] BUILD SUCCESS\n");
+        input.push_str("[INFO] Total time:  4.123 s\n");
+
+        let output = filter_mvn_build(&input);
+        let lines: Vec<&str> = output.lines().collect();
+
+        assert_eq!(lines.len(), MAX_BODY_LINES + 2, "body + marker + footer");
+        assert_eq!(lines[MAX_BODY_LINES], "... +150 more lines");
+        assert_eq!(lines[MAX_BODY_LINES + 1], "BUILD SUCCESS (4.123 s)");
     }
 
     #[test]
