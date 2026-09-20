@@ -102,7 +102,7 @@ pub fn run_build(args: &[String], verbose: u8) -> Result<i32> {
     let raw = format!("{}\n{}", stdout, stderr);
 
     let exit_code = exit_code_from_output(&output, "gradle build");
-    let filtered = filter_gradle_build(&raw);
+    let filtered = super::reword_if_failed(filter_gradle_build(&raw), "Gradle build", exit_code);
 
     if let Some(hint) = crate::core::tee::tee_and_hint(&raw, "gradle_build", exit_code) {
         println!("{}\n{}", filtered, hint);
@@ -190,8 +190,9 @@ pub fn run_other(args: &[OsString], verbose: u8) -> Result<i32> {
 
     let exit_code = exit_code_from_output(&output, "gradle");
 
-    // Apply basic noise stripping for any subcommand
-    let filtered = filter_gradle_build(&raw);
+    // Blacklist noise stripping for any subcommand: unlike the maven side
+    // this only removes known noise, so no payload is lost.
+    let filtered = super::reword_if_failed(filter_gradle_build(&raw), "Gradle build", exit_code);
 
     if let Some(hint) =
         crate::core::tee::tee_and_hint(&raw, &format!("gradle_{}", subcommand), exit_code)

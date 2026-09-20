@@ -140,7 +140,7 @@ fn run_build_phase(phase: &str, args: &[String], verbose: u8) -> Result<i32> {
     let raw = format!("{}\n{}", stdout, stderr);
 
     let exit_code = exit_code_from_output(&output, &format!("mvn {}", phase));
-    let filtered = filter_mvn_build(&raw);
+    let filtered = super::reword_if_failed(filter_mvn_build(&raw), "mvn", exit_code);
 
     if let Some(hint) = crate::core::tee::tee_and_hint(&raw, &format!("mvn_{}", phase), exit_code) {
         println!("{}\n{}", filtered, hint);
