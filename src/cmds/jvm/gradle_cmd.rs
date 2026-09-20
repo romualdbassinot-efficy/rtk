@@ -342,17 +342,34 @@ fn filter_gradle_test(output: &str) -> String {
             let status = &caps[3];
 
             if status == "FAILED" {
-                counted_failed += 1;
-                // Save previous failure if any
-                if let Some(f) = current_failure.take() {
-                    failures.push(f);
+                let class = compact_class_name(&class);
+
+                // Gradle prints the FAILED line twice for each failing test:
+                // once as the test event, and again indented at the head of the
+                // failure detail block. Both trim to the same text, so a repeat
+                // of the test we are already on - or of one already recorded -
+                // is the same failure, not a second one. Without this the test
+                // is listed twice and counted_failed is doubled.
+                let already_seen = current_failure
+                    .as_ref()
+                    .is_some_and(|f| f.class == class && f.method == method)
+                    || failures
+                        .iter()
+                        .any(|f| f.class == class && f.method == method);
+
+                if !already_seen {
+                    counted_failed += 1;
+                    // Save previous failure if any
+                    if let Some(f) = current_failure.take() {
+                        failures.push(f);
+                    }
+                    current_failure = Some(TestFailure {
+                        class,
+                        method,
+                        message: String::new(),
+                        location: String::new(),
+                    });
                 }
-                current_failure = Some(TestFailure {
-                    class: compact_class_name(&class),
-                    method,
-                    message: String::new(),
-                    location: String::new(),
-                });
                 in_failure_block = true;
             } else {
                 counted_passed += 1;
@@ -635,6 +652,52 @@ mod tests {
             output.contains("Expected user name")
                 || output.contains("AssertionError")
                 || output.contains("expected")
+        );
+    }
+
+    #[test]
+    fn test_each_gradle_failure_listed_once() {
+        // Gradle emits the FAILED line twice per failing test - as the test
+        // event, then indented at the head of the detail block. Both must
+        // collapse to one entry, and must not double the tally.
+        let input = include_str!("../../../tests/fixtures/gradle_test_fail_raw.txt");
+        let output = filter_gradle_test(input);
+
+        assert_eq!(
+            output
+                .matches("UserServiceTest > testUpdateUserProfile() FAILED")
+                .count(),
+            1,
+            "failure listed more than once:\n{}",
+            output
+        );
+        assert_eq!(
+            output.matches("FAILED\n").count(),
+            2,
+            "expected exactly 2 failure entries:\n{}",
+            output
+        );
+        // The merged entry keeps the assertion message from the detail block.
+        assert!(output.contains("Expected user name to be \"John Updated\" but was \"John\""));
+    }
+
+    #[test]
+    fn test_duplicate_failed_lines_do_not_double_the_tally() {
+        // Same duplication, but with no summary line, so the tally is the only
+        // source: 1 failing test must read as 1, not 2.
+        let input = "\
+com.example.app.FooTest > testA PASSED
+com.example.app.FooTest > testB FAILED
+    com.example.app.FooTest > testB FAILED
+        java.lang.AssertionError: boom
+
+BUILD FAILED in 3s
+";
+        let output = filter_gradle_test(input);
+        assert!(
+            output.starts_with("FAILED: 1/2 tests"),
+            "expected 1 of 2, got: {}",
+            output
         );
     }
 
