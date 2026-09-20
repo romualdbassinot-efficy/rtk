@@ -74,6 +74,80 @@ lazy_static! {
 /// `max_lines = 50` of the TOML filter this module replaced.
 const MAX_BODY_LINES: usize = 50;
 
+/// Which filter an unrecognised goal list should be routed to.
+#[derive(Debug, PartialEq, Eq)]
+enum Phase {
+    /// Surefire/Failsafe output dominates — use the test filter.
+    Test,
+    /// Compilation or packaging output — use the build filter.
+    Build,
+    /// Payload the build filter would erase — hand it back untouched.
+    Passthrough,
+}
+
+/// Pick a phase from a whole goal list.
+///
+/// `clap` only has variants for `test`, `compile` and `package`, so anything
+/// else - including `mvn clean test` and `mvn clean install`, the two most
+/// common Maven invocations - arrives as an `external_subcommand` list and used
+/// to be passed through wholesale. The point of this is that the routing must
+/// consider *every* goal, not just the first: `clean` produces no payload of
+/// its own and must not decide where `mvn clean test` goes.
+///
+/// A goal list routes to the same filter the explicit variant for that phase
+/// would use, so `mvn clean test` behaves like `rtk mvn test` and
+/// `mvn clean package` like `rtk mvn package`.
+fn detect_phase<I, S>(args: I) -> Phase
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let mut has_package = false;
+    let mut has_test = false;
+    let mut has_compile = false;
+
+    for arg in args {
+        let arg = arg.as_ref();
+
+        // The user explicitly asked for detail or for Maven's own output.
+        // Filtering it would be answering a different question.
+        if matches!(
+            arg,
+            "-X" | "--debug" | "-e" | "--errors" | "-v" | "--version" | "-h" | "--help"
+        ) {
+            return Phase::Passthrough;
+        }
+
+        // Any other flag: -DskipTests, -pl, -am, -T1C, --batch-mode, ...
+        if arg.starts_with('-') {
+            continue;
+        }
+
+        match arg {
+            // Packaging phases run the test phase as part of the lifecycle,
+            // so they subsume it and win the precedence below.
+            "package" | "install" | "verify" | "deploy" => has_package = true,
+            // Failsafe's output has the same shape as Surefire's.
+            "test" | "integration-test" => has_test = true,
+            "compile" | "test-compile" => has_compile = true,
+            // `clean` is a real phase but emits nothing worth filtering, and
+            // `site`, `dependency:*`, `exec:*`, `versions:*` and every
+            // unrecognised goal carry payload the build filter would delete.
+            _ => {}
+        }
+    }
+
+    if has_package {
+        Phase::Build
+    } else if has_test {
+        Phase::Test
+    } else if has_compile {
+        Phase::Build
+    } else {
+        Phase::Passthrough
+    }
+}
+
 pub fn run_test(args: &[String], verbose: u8) -> Result<i32> {
     let timer = tracking::TimedExecution::start();
 
@@ -194,19 +268,24 @@ pub fn run_other(args: &[OsString], verbose: u8) -> Result<i32> {
 
     let exit_code = exit_code_from_output(&output, "mvn");
 
-    // Passthrough, ANSI-stripped only — deliberately NOT filter_mvn_build.
+    // Route on the whole goal list, not on args[0].
     //
-    // filter_mvn_build is a whitelist: it keeps reactor lines, [ERROR],
-    // [WARNING], "Compiling N source files" and their continuation lines, and
-    // drops everything else. Any goal whose payload is none of those had its
-    // entire output erased — `mvn dependency:tree` returned just
+    // Phase::Passthrough is ANSI-stripped only, deliberately never
+    // filter_mvn_build: that filter is a whitelist - it keeps reactor lines,
+    // [ERROR], [WARNING], "Compiling N source files" and their continuation
+    // lines, and drops everything else - so a goal whose payload is none of
+    // those had all of it erased. `mvn dependency:tree` returned just
     // "BUILD SUCCESS (1.2 s)", and the same went for help:effective-pom,
-    // versions:*, and program output from exec:java. Deleting
-    // src/filters/mvn-build.toml removed the net that used to cover them.
-    //
-    // develop's mvn_cmd.rs routes the same set (clean, site, dependency:*,
-    // --version, --help, any unrecognised goal) to passthrough for this reason.
-    let filtered = strip_ansi(&raw);
+    // versions:* and program output from exec:java.
+    let goals: Vec<String> = args
+        .iter()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect();
+    let filtered = match detect_phase(&goals) {
+        Phase::Test => filter_mvn_test(&raw),
+        Phase::Build => super::reword_if_failed(filter_mvn_build(&raw), "mvn", exit_code),
+        Phase::Passthrough => strip_ansi(&raw),
+    };
 
     if let Some(hint) =
         crate::core::tee::tee_and_hint(&raw, &format!("mvn_{}", subcommand), exit_code)
@@ -714,6 +793,73 @@ mod tests {
         // Should strip noise
         assert!(!output.contains("Scanning for projects"));
         assert!(!output.contains("maven-resources-plugin"));
+    }
+
+    #[test]
+    fn test_detect_phase_reads_the_whole_goal_list() {
+        // The bug this exists for: `mvn clean test` reaches clap as
+        // Other(["clean", "test"]), and routing on args[0] made it passthrough,
+        // so the two most common Maven invocations never saw a filter.
+        assert_eq!(detect_phase(["clean", "test"]), Phase::Test);
+        assert_eq!(detect_phase(["clean", "install"]), Phase::Build);
+        assert_eq!(detect_phase(["clean", "verify"]), Phase::Build);
+        assert_eq!(detect_phase(["clean", "deploy"]), Phase::Build);
+        assert_eq!(detect_phase(["clean", "test-compile"]), Phase::Build);
+        assert_eq!(detect_phase(["integration-test"]), Phase::Test);
+
+        // Flags must not be mistaken for goals, and must not hide the goal.
+        assert_eq!(
+            detect_phase(["clean", "test", "-DskipTests=false", "-pl", "app-web"]),
+            Phase::Test
+        );
+        assert_eq!(detect_phase(["-T1C", "clean", "install"]), Phase::Build);
+
+        // Packaging runs the test phase as part of the lifecycle, so it wins.
+        assert_eq!(detect_phase(["clean", "test", "package"]), Phase::Build);
+        // ... but a bare compile does not outrank an explicit test.
+        assert_eq!(detect_phase(["compile", "test"]), Phase::Test);
+
+        // No lifecycle goal at all: payload the build filter would erase.
+        assert_eq!(detect_phase(["clean"]), Phase::Passthrough);
+        assert_eq!(detect_phase(["dependency:tree"]), Phase::Passthrough);
+        assert_eq!(detect_phase(["help:effective-pom"]), Phase::Passthrough);
+        assert_eq!(detect_phase(["site"]), Phase::Passthrough);
+        assert_eq!(detect_phase(["exec:java"]), Phase::Passthrough);
+        assert_eq!(detect_phase(Vec::<String>::new()), Phase::Passthrough);
+    }
+
+    #[test]
+    fn test_detect_phase_respects_verbose_and_meta_flags() {
+        // The user asked for detail, or for Maven's own output. Filtering it
+        // would be answering a different question.
+        for flag in ["-X", "--debug", "-e", "--errors"] {
+            assert_eq!(
+                detect_phase(["clean", "test", flag]),
+                Phase::Passthrough,
+                "{} must bypass filtering",
+                flag
+            );
+        }
+        for flag in ["-v", "--version", "-h", "--help"] {
+            assert_eq!(detect_phase([flag]), Phase::Passthrough);
+        }
+    }
+
+    #[test]
+    fn test_clean_test_now_reaches_the_surefire_filter() {
+        // End to end for the routed phase: the goal list that used to pass
+        // through must now produce the compact Surefire summary.
+        let raw = include_str!("../../../tests/fixtures/mvn_test_fail_raw.txt");
+        assert_eq!(detect_phase(["clean", "test"]), Phase::Test);
+
+        let filtered = filter_mvn_test(raw);
+        assert!(
+            filtered.starts_with("FAILED: 2/20 tests"),
+            "got: {}",
+            filtered
+        );
+        // And it is a real compression, not the raw text back.
+        assert!(filtered.lines().count() < raw.lines().count() / 4);
     }
 
     #[test]

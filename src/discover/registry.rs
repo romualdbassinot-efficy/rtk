@@ -801,22 +801,39 @@ mod tests {
 
     #[test]
     fn test_mvn_rule_claims_only_filtered_goals() {
-        // clean, install and verify have no MavenCommands variant, so they
-        // reach run_other, which passes through. Claiming savings for them
-        // inflated the discover report.
-        assert_eq!(
-            classify_command("mvn test"),
+        // maven_cmd::detect_phase routes on the whole goal list, so the rule
+        // has to see past leading flags and `clean` to the lifecycle phase.
+        let savings = |cmd: &str| match classify_command(cmd) {
             Classification::Supported {
-                rtk_equivalent: "rtk mvn",
-                category: "Build",
-                estimated_savings_pct: 88.0,
-                status: RtkStatus::Existing,
-            }
-        );
-        for goal in ["mvn verify", "mvn install", "mvn clean"] {
-            assert!(
-                !matches!(classify_command(goal), Classification::Supported { .. }),
-                "{} is passthrough today and must not be claimed as supported",
+                estimated_savings_pct,
+                ..
+            } => Some(estimated_savings_pct),
+            _ => None,
+        };
+
+        // The goal is not always the first token.
+        assert_eq!(savings("mvn test"), Some(88.0));
+        assert_eq!(savings("mvn clean test"), Some(88.0));
+        assert_eq!(savings("mvn -T1C clean test -DskipTests=false"), Some(88.0));
+        assert_eq!(savings("mvn clean integration-test"), Some(88.0));
+
+        // Packaging phases share the build filter, hence the fallback figure.
+        assert_eq!(savings("mvn clean install"), Some(75.0));
+        assert_eq!(savings("mvn clean verify"), Some(75.0));
+        assert_eq!(savings("mvn clean package"), Some(75.0));
+
+        // No lifecycle phase in the list: these pass through untouched, so
+        // claiming any saving for them would inflate the report.
+        for goal in [
+            "mvn clean",
+            "mvn dependency:tree",
+            "mvn site",
+            "mvn help:effective-pom",
+        ] {
+            assert_eq!(
+                savings(goal),
+                None,
+                "{} passes through and must not be claimed as supported",
                 goal
             );
         }

@@ -486,17 +486,29 @@ pub const RULES: &[RtkRule] = &[
         subcmd_status: &[],
     },
     RtkRule {
-        // Only the goals that reach a filter are claimed. clean, install and
-        // verify have no MavenCommands variant, so they land in run_other,
-        // which passes through - claiming 75% for them inflated the report.
-        pattern: r"^mvn\s+(compile|package|test)\b",
+        // Only the goals that reach a filter are claimed, but the goal is not
+        // necessarily the first token: `mvn clean test` and `mvn -T1C clean
+        // install` are routed by maven_cmd::detect_phase over the whole list,
+        // so leading flags and `clean` are skipped here the same way. A goal
+        // list with no lifecycle phase at all (`mvn clean`, `dependency:tree`,
+        // `site`) passes through and is deliberately not matched.
+        pattern: r"^mvn\s+(?:(?:-\S+|clean)\s+)*(compile|test-compile|test|integration-test|package|install|verify|deploy)\b",
         rtk_cmd: "rtk mvn",
         rewrite_prefixes: &["mvn"],
         category: "Build",
         // Measured on tests/fixtures: compile 97.0%, test 94.8% (failing run)
-        // to 98.7% (passing run). Claimed conservatively.
+        // to 98.7% (passing run). Claimed conservatively. The packaging phases
+        // run through the same build filter as compile, hence the shared
+        // fallback.
         savings_pct: 75.0,
-        subcmd_savings: &[("test", 88.0), ("compile", 75.0), ("package", 75.0)],
+        subcmd_savings: &[
+            ("test", 88.0),
+            // Failsafe output has the same shape, so the same compression.
+            ("integration-test", 88.0),
+            ("compile", 75.0),
+            ("test-compile", 75.0),
+            ("package", 75.0),
+        ],
         subcmd_status: &[],
     },
     RtkRule {
